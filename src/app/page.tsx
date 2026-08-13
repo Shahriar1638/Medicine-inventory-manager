@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import type { Medicine, SortKey } from "@/lib/types";
 import { defaultPriceOf, formatBDT } from "@/lib/format";
 import { MedicineIcon, typeChipClass } from "@/components/MedicineIcon";
-import { CartIcon, GridIcon, ListIcon, SearchIcon } from "@/components/icons";
+import { CartIcon, SearchIcon } from "@/components/icons";
 import CartDrawer from "@/components/CartDrawer";
 import PaymentModal from "@/components/PaymentModal";
 
@@ -21,96 +21,6 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 function firstPricedPackageIndex(medicine: Medicine): number {
   return medicine.packages.findIndex((pkg) => pkg.price !== null);
-}
-
-function MedicineCard({
-  medicine,
-  onAdd,
-}: {
-  medicine: Medicine;
-  onAdd: (packageIndex: number) => void;
-}) {
-  const [selected, setSelected] = useState(() => firstPricedPackageIndex(medicine));
-  const selectedPackage =
-    selected >= 0 && selected < medicine.packages.length ? medicine.packages[selected] : null;
-  const selectable = medicine.packages.length > 0;
-
-  return (
-    <article className="medicine-card">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <span className="card-media">
-          <MedicineIcon dosageForm={medicine.dosageForm} />
-        </span>
-        <span className={typeChipClass(medicine.type)}>{medicine.type ?? "unknown"}</span>
-      </div>
-
-      <div style={{ minWidth: 0 }}>
-        <h3 className="truncate" style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>
-          {medicine.name}
-        </h3>
-        <p className="muted truncate" style={{ fontSize: 13, margin: "2px 0 0" }}>
-          {[medicine.generic, medicine.strength].filter(Boolean).join(" · ") || "—"}
-        </p>
-      </div>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {medicine.dosageForm && <span className="chip">{medicine.dosageForm}</span>}
-        {medicine.drugClass && (
-          <span className="chip" title={medicine.drugClass}>
-            <span className="truncate" style={{ maxWidth: 140 }}>
-              {medicine.drugClass}
-            </span>
-          </span>
-        )}
-      </div>
-
-      <p className="faint truncate" style={{ fontSize: 12, margin: 0 }}>
-        {medicine.manufacturer ?? "—"}
-      </p>
-
-      {selectable && (
-        <select
-          className="select"
-          value={selected}
-          onChange={(event) => setSelected(Number(event.target.value))}
-          aria-label={`${medicine.name} package`}
-          style={{ width: "100%", paddingTop: 7, paddingBottom: 7 }}
-          disabled={!selectable}
-        >
-          {medicine.packages.map((pkg, index) => (
-            <option key={index} value={index} disabled={pkg.price === null}>
-              {pkg.label || `Package ${index + 1}`} — {formatBDT(pkg.price)}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginTop: 4,
-        }}
-      >
-        <span className="font-mono-data" style={{ fontSize: 17, fontWeight: 700 }}>
-          {formatBDT(selectedPackage?.price)}
-        </span>
-        <span className="faint" style={{ fontSize: 11 }}>
-          {selectable ? `${medicine.packages.length} pack${medicine.packages.length > 1 ? "s" : ""}` : "no price"}
-        </span>
-      </div>
-
-      <button
-        className="btn btn-primary btn-block"
-        disabled={!selectedPackage || selectedPackage.price === null}
-        onClick={() => onAdd(selected)}
-      >
-        <CartIcon width={15} height={15} />
-        {!selectable ? "Price unavailable" : "Add to cart"}
-      </button>
-    </article>
-  );
 }
 
 function MedicineRow({
@@ -149,7 +59,7 @@ function MedicineRow({
           value={selected}
           onChange={(event) => setSelected(Number(event.target.value))}
           aria-label={`${medicine.name} package`}
-          style={{ paddingTop: 6, paddingBottom: 6, maxWidth: 200 }}
+          style={{ paddingTop: 6, paddingBottom: 6, width: 200, flex: "0 0 200px" }}
         >
           {medicine.packages.map((pkg, index) => (
             <option key={index} value={index} disabled={pkg.price === null}>
@@ -158,7 +68,10 @@ function MedicineRow({
           ))}
         </select>
       ) : (
-        <span className="faint" style={{ fontSize: 12, minWidth: 90 }}>
+        <span
+          className="faint"
+          style={{ fontSize: 12, minWidth: 200, flex: "0 0 200px", display: "inline-flex", alignItems: "center" }}
+        >
           Price unavailable
         </span>
       )}
@@ -187,7 +100,6 @@ export default function POSPage() {
   const [mfrFilter, setMfrFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [view, setView] = useState<"cards" | "list">("cards");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(24);
 
@@ -399,22 +311,6 @@ export default function POSPage() {
               </option>
             ))}
           </select>
-          <div className="view-toggle" role="group" aria-label="View mode">
-            <button
-              className={view === "cards" ? "active" : ""}
-              onClick={() => setView("cards")}
-              title="Card view"
-            >
-              <GridIcon width={17} height={17} />
-            </button>
-            <button
-              className={view === "list" ? "active" : ""}
-              onClick={() => setView("list")}
-              title="List view"
-            >
-              <ListIcon width={17} height={17} />
-            </button>
-          </div>
         </div>
 
         {medicinesLoading ? (
@@ -440,23 +336,6 @@ export default function POSPage() {
             >
               Clear filters
             </button>
-          </div>
-        ) : view === "cards" ? (
-          <div
-            className="cards-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-              gap: 16,
-            }}
-          >
-            {pageItems.map((medicine) => (
-              <MedicineCard
-                key={medicine.id}
-                medicine={medicine}
-                onAdd={(index) => addToCart(medicine, index)}
-              />
-            ))}
           </div>
         ) : (
           <div>

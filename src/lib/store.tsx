@@ -18,6 +18,12 @@ const MEDICINES_URL = "/medicines.json";
 
 type Theme = "light" | "dark";
 
+export interface Toast {
+  id: number;
+  name: string;
+  price: number;
+}
+
 interface StoreValue {
   theme: Theme;
   toggleTheme: () => void;
@@ -29,6 +35,8 @@ interface StoreValue {
   paymentOpen: boolean;
   setPaymentOpen: (open: boolean) => void;
   addToCart: (medicine: Medicine, packageIndex: number) => void;
+  toasts: Toast[];
+  dismissToast: (id: number) => void;
   updateQty: (key: string, delta: number) => void;
   removeFromCart: (key: string) => void;
   clearCart: () => void;
@@ -86,6 +94,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   );
   const [cartOpen, setCartOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [medicinesLoading, setMedicinesLoading] = useState(true);
 
@@ -136,32 +145,47 @@ export function AppProviders({ children }: { children: ReactNode }) {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   }, []);
 
-  const addToCart = useCallback((medicine: Medicine, packageIndex: number) => {
-    const pkg = medicine.packages[packageIndex];
-    if (!pkg || pkg.price === null) return;
-    setCart((prev) => {
-      const key = `${medicine.id}:${packageIndex}`;
-      const existing = prev.find((item) => item.key === key);
-      if (existing) {
-        return prev.map((item) =>
-          item.key === key ? { ...item, qty: item.qty + 1 } : item
-        );
-      }
-      const item: CartItem = {
-        key,
-        medicineId: medicine.id,
-        name: medicine.name ?? `Medicine #${medicine.id}`,
-        generic: medicine.generic,
-        strength: medicine.strength,
-        dosageForm: medicine.dosageForm,
-        packageLabel: pkg.label,
-        packSize: pkg.packSize,
-        unitPrice: pkg.price,
-        qty: 1,
-      };
-      return [...prev, item];
-    });
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const addToCart = useCallback(
+    (medicine: Medicine, packageIndex: number) => {
+      const pkg = medicine.packages[packageIndex];
+      if (!pkg || pkg.price === null) return;
+      const price = pkg.price;
+      setCart((prev) => {
+        const key = `${medicine.id}:${packageIndex}`;
+        const existing = prev.find((item) => item.key === key);
+        if (existing) {
+          return prev.map((item) =>
+            item.key === key ? { ...item, qty: item.qty + 1 } : item
+          );
+        }
+        const item: CartItem = {
+          key,
+          medicineId: medicine.id,
+          name: medicine.name ?? `Medicine #${medicine.id}`,
+          generic: medicine.generic,
+          strength: medicine.strength,
+          dosageForm: medicine.dosageForm,
+          packageLabel: pkg.label,
+          packSize: pkg.packSize,
+          unitPrice: pkg.price,
+          qty: 1,
+        };
+        return [...prev, item];
+      });
+
+      const id = Date.now() + Math.random();
+      setToasts((prev) => [
+        ...prev.slice(-3),
+        { id, name: medicine.name ?? `Medicine #${medicine.id}`, price },
+      ]);
+      window.setTimeout(() => dismissToast(id), 3000);
+    },
+    [dismissToast]
+  );
 
   const updateQty = useCallback((key: string, delta: number) => {
     setCart((prev) =>
@@ -313,6 +337,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
       paymentOpen,
       setPaymentOpen,
       addToCart,
+      toasts,
+      dismissToast,
       updateQty,
       removeFromCart,
       clearCart,
@@ -331,6 +357,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
       cartOpen,
       paymentOpen,
       addToCart,
+      toasts,
+      dismissToast,
       updateQty,
       removeFromCart,
       clearCart,
