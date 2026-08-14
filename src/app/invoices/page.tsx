@@ -190,22 +190,6 @@ export default function InvoicesPage() {
   return (
     <div className="app-shell">
       <div className="main">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-            marginBottom: 20,
-          }}
-        >
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
-              Invoices & Revenue
-            </h1>
-          </div>
-        </div>
-
         <div className="stats-grid" style={{ marginBottom: 24 }}>
           {statCards.map((card) => (
             <div className="card stat-card" key={card.label}>
@@ -322,7 +306,7 @@ export default function InvoicesPage() {
                   <th>Date & time</th>
                   <th>Items</th>
                   <th>Payment</th>
-                  <th className="num">Total</th>
+                  <th>Total</th>
                   <th style={{ width: 60 }}></th>
                 </tr>
               </thead>
@@ -337,7 +321,7 @@ export default function InvoicesPage() {
                     <td>
                       <span className="chip chip-soft">{invoice.paymentMethod}</span>
                     </td>
-                    <td className="num font-mono-data" style={{ fontWeight: 600 }}>
+                    <td className="font-mono-data" style={{ fontWeight: 600 }}>
                       {formatBDT(invoice.total)}
                     </td>
                     <td className="num">
@@ -367,8 +351,19 @@ export default function InvoicesPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-header">
-              <h2 className="section-title">Invoice {selected.id}</h2>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div>
+                <h2 className="section-title">Invoice {selected.id}</h2>
+                {selected.customer && (
+                  <p className="muted" style={{ fontSize: 13, margin: "2px 0 0" }}>
+                    {selected.customer.name || "—"}
+                    {selected.customer.phone ? ` · ${selected.customer.phone}` : ""}
+                  </p>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span className="font-mono-data" style={{ fontWeight: 700, fontSize: 15 }}>
+                  {formatBDT(selected.total)}
+                </span>
                 <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
                   <PrinterIcon width={14} height={14} />
                   Print

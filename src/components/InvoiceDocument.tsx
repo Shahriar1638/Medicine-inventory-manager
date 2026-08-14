@@ -34,27 +34,33 @@ export default function InvoiceDocument({ invoice }: { invoice: Invoice }) {
         </div>
       </div>
 
-      <div className="invoice-meta" style={{ marginTop: 16 }}>
-        <span className="faint">Invoice date</span>
-        <span className="font-mono-data">{formatDateTime(invoice.createdAt)}</span>
-        <span className="faint">Payment method</span>
-        <span>{invoice.paymentMethod}</span>
-        <span className="faint">Line items</span>
-        <span className="font-mono-data">{invoice.items.length}</span>
-        <span className="faint">Prepared by</span>
-        <span>Demo Operator</span>
-      </div>
-
-      {invoice.customer && (
-        <div className="invoice-meta" style={{ marginTop: 12 }}>
-          <span className="faint">Customer</span>
-          <span>{invoice.customer.name || "—"}</span>
-          <span className="faint">Phone</span>
-          <span className="font-mono-data">{invoice.customer.phone || "—"}</span>
-          <span className="faint">Address</span>
-          <span>{invoice.customer.address || "—"}</span>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 24,
+          marginTop: 16,
+        }}
+      >
+        <div className="invoice-meta">
+          <span className="faint">Invoice date</span>
+          <span className="font-mono-data">{formatDateTime(invoice.createdAt)}</span>
+          <span className="faint">Payment method</span>
+          <span>{invoice.paymentMethod}</span>
+          <span className="faint">Line items</span>
+          <span className="font-mono-data">{invoice.items.length}</span>
+          <span className="faint">Prepared by</span>
+          <span>Demo Operator</span>
         </div>
-      )}
+        <div className="invoice-meta">
+          <span className="faint">Customer</span>
+          <span>{invoice.customer?.name || "—"}</span>
+          <span className="faint">Phone</span>
+          <span className="font-mono-data">{invoice.customer?.phone || "—"}</span>
+          <span className="faint">Address</span>
+          <span>{invoice.customer?.address || "—"}</span>
+        </div>
+      </div>
 
       <table className="invoice-table">
         <thead>

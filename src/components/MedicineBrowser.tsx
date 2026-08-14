@@ -160,10 +160,8 @@ function MedicineRow({
 }
 
 export default function MedicineBrowser({
-  title,
   layout,
 }: {
-  title: string;
   layout: "list" | "grid";
 }) {
   const { medicines, medicinesLoading, cartCount, setCartOpen, addToCart } = useStore();
@@ -262,23 +260,6 @@ export default function MedicineBrowser({
   return (
     <div className="app-shell">
       <div className="main">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-            marginBottom: 20,
-          }}
-        >
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
-              {title}
-            </h1>
-          </div>
-          <div className="spacer" />
-        </div>
-
         <div className="filter-bar card" style={{ padding: 14, marginBottom: 20 }}>
           {layout === "grid" ? (
             <div className="filter-row filter-row--wide">
