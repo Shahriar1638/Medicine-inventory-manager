@@ -17,10 +17,14 @@ export default function Toaster() {
             <CheckIcon width={16} height={16} />
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>Added to cart</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>
+              {toast.title ?? "Added to cart"}
+            </div>
             <div className="toast-sub">
               <span className="truncate">{toast.name}</span>
-              <span className="font-mono-data toast-price">{formatBDT(toast.price)}</span>
+              {toast.price !== undefined && (
+                <span className="font-mono-data toast-price">{formatBDT(toast.price)}</span>
+              )}
             </div>
           </div>
           <button

@@ -5,9 +5,10 @@ import { useStore } from "@/lib/store";
 import type { Medicine, SortKey } from "@/lib/types";
 import { defaultPriceOf, formatBDT } from "@/lib/format";
 import { MedicineIcon, typeChipClass } from "@/components/MedicineIcon";
-import { CartIcon, EditIcon, SearchIcon } from "@/components/icons";
+import { CartIcon, EditIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import CartDrawer from "@/components/CartDrawer";
 import PaymentModal from "@/components/PaymentModal";
+import AddMedicineModal from "@/components/AddMedicineModal";
 
 const PAGE_SIZES = [24, 48, 96];
 
@@ -175,6 +176,7 @@ export default function MedicineBrowser({
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(24);
+  const [addOpen, setAddOpen] = useState(false);
 
   const resetPage = () => setPage(1);
 
@@ -434,6 +436,15 @@ export default function MedicineBrowser({
                   </option>
                 ))}
               </select>
+              <button
+                className="btn btn-primary"
+                onClick={() => setAddOpen(true)}
+                disabled={medicinesLoading}
+                title={medicinesLoading ? "Catalog is still loading…" : undefined}
+              >
+                <PlusIcon width={16} height={16} />
+                Add Medicine
+              </button>
             </div>
           )}
         </div>
@@ -549,6 +560,7 @@ export default function MedicineBrowser({
 
       <CartDrawer />
       <PaymentModal />
+      <AddMedicineModal open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }

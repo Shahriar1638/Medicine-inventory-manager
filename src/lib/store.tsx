@@ -15,14 +15,16 @@ import type { CartItem, Invoice, Medicine } from "@/lib/types";
 const CART_KEY = "medshop.cart";
 const INVOICES_KEY = "medshop.invoices";
 const THEME_KEY = "medshop.theme";
+const EXTRA_MEDICINES_KEY = "medshop.medicines.extra";
 const MEDICINES_URL = "/medicines.json";
 
 type Theme = "light" | "dark";
 
 export interface Toast {
   id: number;
+  title?: string;
   name: string;
-  price: number;
+  price?: number;
 }
 
 interface StoreValue {
@@ -36,6 +38,7 @@ interface StoreValue {
   paymentOpen: boolean;
   setPaymentOpen: (open: boolean) => void;
   addToCart: (medicine: Medicine, packageIndex: number) => void;
+  addMedicine: (medicine: Medicine) => void;
   toasts: Toast[];
   dismissToast: (id: number) => void;
   updateQty: (key: string, delta: number) => void;
@@ -156,7 +159,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
     fetchMedicines()
       .then((data) => {
         if (!cancelled) {
-          setMedicines(data);
+          // Merge user-added medicines (localStorage) on top of the static
+          // catalog, dropping any that collide with a static id.
+          const staticIds = new Set(data.map((medicine) => medicine.id));
+          const extra = loadFromStorage<Medicine[]>(EXTRA_MEDICINES_KEY, []).filter(
+            (medicine) => !staticIds.has(medicine.id)
+          );
+          setMedicines([...extra, ...data]);
           setMedicinesLoading(false);
         }
       })
@@ -209,6 +218,26 @@ export function AppProviders({ children }: { children: ReactNode }) {
       setToasts((prev) => [
         ...prev.slice(-3),
         { id, name: medicine.name ?? `Medicine #${medicine.id}`, price },
+      ]);
+      window.setTimeout(() => dismissToast(id), 3000);
+    },
+    [dismissToast]
+  );
+
+  const addMedicine = useCallback(
+    (medicine: Medicine) => {
+      const current = loadFromStorage<Medicine[]>(EXTRA_MEDICINES_KEY, []);
+      writeStored(EXTRA_MEDICINES_KEY, [...current, medicine]);
+      setMedicines((prev) => [medicine, ...prev]);
+
+      const id = Date.now() + Math.random();
+      setToasts((prev) => [
+        ...prev.slice(-3),
+        {
+          id,
+          title: "Medicine added",
+          name: medicine.name ?? `Medicine #${medicine.id}`,
+        },
       ]);
       window.setTimeout(() => dismissToast(id), 3000);
     },
@@ -367,6 +396,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       paymentOpen,
       setPaymentOpen,
       addToCart,
+      addMedicine,
       toasts,
       dismissToast,
       updateQty,
@@ -387,6 +417,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       cartOpen,
       paymentOpen,
       addToCart,
+      addMedicine,
       toasts,
       dismissToast,
       updateQty,
