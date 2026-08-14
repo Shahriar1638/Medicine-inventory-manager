@@ -16,6 +16,15 @@ const InvoiceItemSchema = new Schema(
   { _id: false }
 );
 
+const CustomerSchema = new Schema(
+  {
+    name: { type: String, default: "" },
+    address: { type: String, default: "" },
+    phone: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 // id is our human-readable invoice number, e.g. "INV-000001".
 // _id is Mongo's automatically generated ObjectId.
 const InvoiceSchema = new Schema(
@@ -27,6 +36,7 @@ const InvoiceSchema = new Schema(
     subtotal: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true, min: 0 },
     items: { type: [InvoiceItemSchema], default: [] },
+    customer: { type: CustomerSchema, default: null },
   },
   {
     timestamps: true,

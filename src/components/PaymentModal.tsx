@@ -16,6 +16,7 @@ export default function PaymentModal() {
     useStore();
   const [method, setMethod] = useState(PAYMENT_METHODS[0]);
   const [completed, setCompleted] = useState<Invoice | null>(null);
+  const [customer, setCustomer] = useState({ name: "", address: "", phone: "" });
 
   const draft = useMemo<Invoice | null>(() => {
     if (cart.length === 0) return null;
@@ -33,6 +34,11 @@ export default function PaymentModal() {
     }));
     const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
     const rounded = Math.round(subtotal * 100) / 100;
+    const customerInfo = {
+      name: customer.name.trim(),
+      address: customer.address.trim(),
+      phone: customer.phone.trim(),
+    };
     return {
       id: nextInvoiceId(invoices),
       createdAt: new Date().toISOString(),
@@ -41,8 +47,12 @@ export default function PaymentModal() {
       discount: 0,
       total: rounded,
       paymentMethod: method,
+      customer:
+        customerInfo.name || customerInfo.address || customerInfo.phone
+          ? customerInfo
+          : undefined,
     };
-  }, [cart, invoices, method]);
+  }, [cart, invoices, method, customer]);
 
   if (!paymentOpen) return null;
 
@@ -57,6 +67,7 @@ export default function PaymentModal() {
     setPaymentOpen(false);
     setCompleted(null);
     setMethod(PAYMENT_METHODS[0]);
+    setCustomer({ name: "", address: "", phone: "" });
   };
 
   return (
@@ -105,7 +116,48 @@ export default function PaymentModal() {
               </div>
             </div>
           ) : draft ? (
-            <InvoiceDocument invoice={draft} />
+            <div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: 10,
+                  marginBottom: 20,
+                  padding: 14,
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--r-md)",
+                }}
+              >
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <span
+                    className="faint"
+                    style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}
+                  >
+                    Customer details
+                  </span>
+                </div>
+                <input
+                  className="input"
+                  placeholder="Customer name"
+                  value={customer.name}
+                  onChange={(event) => setCustomer({ ...customer, name: event.target.value })}
+                />
+                <input
+                  className="input"
+                  placeholder="Phone number"
+                  value={customer.phone}
+                  onChange={(event) => setCustomer({ ...customer, phone: event.target.value })}
+                />
+                <input
+                  className="input"
+                  placeholder="Address"
+                  value={customer.address}
+                  onChange={(event) => setCustomer({ ...customer, address: event.target.value })}
+                />
+              </div>
+              <InvoiceDocument invoice={draft} />
+            </div>
           ) : (
             <p className="muted">Your cart is empty.</p>
           )}

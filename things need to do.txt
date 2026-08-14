@@ -1,0 +1,8 @@
+toaster bottom left.
+
+filter remove --> search , fix search bar and filters 
+
+medicine --> grid wise 
+
+
+Invoice and revenue , inventory, medicine listing , add medicine 

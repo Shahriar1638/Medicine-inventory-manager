@@ -187,6 +187,7 @@ body {
 }
 
 .nav-link {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -206,9 +207,55 @@ body {
 }
 
 .nav-link.active {
-  background: var(--primary-soft);
-  color: var(--on-primary-soft);
-  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+  background: transparent;
+  color: var(--primary);
+  border-color: transparent;
+}
+
+.nav-link.active::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 5px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+
+/* Mobile nav toggle — hidden on desktop. Specificity (button.nav-toggle)
+   beats .btn-icon later in the file, which would otherwise force it visible. */
+button.nav-toggle {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  button.nav-toggle {
+    display: inline-grid;
+  }
+
+  .nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 10px 16px 14px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-raised);
+    display: none;
+  }
+
+  .nav.open {
+    display: flex;
+  }
+
+  .nav-link {
+    padding: 12px 14px;
+  }
 }
 
 /* ---------- Buttons ---------- */
@@ -308,6 +355,26 @@ body {
   display: inline-grid;
   place-items: center;
   border-radius: var(--r-sm);
+}
+
+/* Theme toggle shows the correct icon via the pre-hydration .dark class,
+   so the button markup never differs between server and client. */
+.theme-toggle {
+  position: relative;
+}
+
+.theme-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+html:not(.dark) .theme-icon-dark {
+  visibility: hidden;
+}
+
+html.dark .theme-icon-light {
+  visibility: hidden;
 }
 
 /* ---------- Inputs ---------- */
@@ -665,12 +732,12 @@ body {
 
 .toast-stack {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  bottom: 16px;
+  left: 16px;
   z-index: 70;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 8px;
   pointer-events: none;
 }
@@ -737,7 +804,7 @@ body {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateX(24px);
+    transform: translateX(-24px);
   }
   to {
     opacity: 1;
@@ -869,6 +936,24 @@ body {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* Wide screens: let the grid filter rows stretch to fill the bar. */
+.filter-row--wide .select {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.filter-row--wide .search-bar {
+  max-width: none;
 }
 
 /* ---------- Invoice sheet ---------- */

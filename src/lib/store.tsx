@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { CartItem, Invoice, Medicine } from "@/lib/types";
@@ -60,6 +61,48 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   }
 }
 
+const storageListeners = new Set<() => void>();
+
+function subscribeStorage(callback: () => void): () => void {
+  storageListeners.add(callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    storageListeners.delete(callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function writeStored<T>(key: string, value: T): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // storage unavailable
+  }
+  for (const listener of storageListeners) listener();
+}
+
+function storedSnapshot<T>(key: string, fallback: T): () => T {
+  let cache: { raw: string | null; value: T } | null = null;
+  return () => {
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(key);
+    } catch {
+      raw = null;
+    }
+    if (!raw) return fallback;
+    if (cache && cache.raw === raw) return cache.value;
+    let value: T;
+    try {
+      value = JSON.parse(raw) as T;
+    } catch {
+      return fallback;
+    }
+    cache = { raw, value };
+    return value;
+  };
+}
+
 function dedupeById(invoices: Invoice[]): Invoice[] {
   const seen = new Set<string>();
   const result: Invoice[] = [];
@@ -82,16 +125,21 @@ function fetchMedicines(): Promise<Medicine[]> {
   return medicinesPromise;
 }
 
+// Hydration-safe external store. getServerSnapshot returns the fallback, so the
+// server-rendered HTML matches the client's hydrating render. After hydration,
+// React re-reads the real localStorage snapshot (theme / cart / invoices).
+function useStored<T>(key: string, fallback: T): T {
+  return useSyncExternalStore(
+    subscribeStorage,
+    storedSnapshot<T>(key, fallback),
+    () => fallback
+  );
+}
+
 export function AppProviders({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() =>
-    loadFromStorage<Theme>(THEME_KEY, "light")
-  );
-  const [cart, setCart] = useState<CartItem[]>(() =>
-    loadFromStorage<CartItem[]>(CART_KEY, [])
-  );
-  const [invoices, setInvoices] = useState<Invoice[]>(() =>
-    loadFromStorage<Invoice[]>(INVOICES_KEY, [])
-  );
+  const theme = useStored<Theme>(THEME_KEY, "light");
+  const cart = useStored<CartItem[]>(CART_KEY, []);
+  const invoices = useStored<Invoice[]>(INVOICES_KEY, []);
   const [cartOpen, setCartOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -101,28 +149,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
-    try {
-      window.localStorage.setItem(THEME_KEY, JSON.stringify(theme));
-    } catch {
-      // storage unavailable
-    }
   }, [theme]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(CART_KEY, JSON.stringify(cart));
-    } catch {
-      // storage unavailable
-    }
-  }, [cart]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
-    } catch {
-      // storage unavailable
-    }
-  }, [invoices]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,8 +169,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  }, []);
+    writeStored<Theme>(THEME_KEY, theme === "dark" ? "light" : "dark");
+  }, [theme]);
 
   const dismissToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -154,28 +181,29 @@ export function AppProviders({ children }: { children: ReactNode }) {
       const pkg = medicine.packages[packageIndex];
       if (!pkg || pkg.price === null) return;
       const price = pkg.price;
-      setCart((prev) => {
-        const key = `${medicine.id}:${packageIndex}`;
-        const existing = prev.find((item) => item.key === key);
-        if (existing) {
-          return prev.map((item) =>
+      const current = loadFromStorage<CartItem[]>(CART_KEY, []);
+      const key = `${medicine.id}:${packageIndex}`;
+      const existing = current.find((item) => item.key === key);
+      const next = existing
+        ? current.map((item) =>
             item.key === key ? { ...item, qty: item.qty + 1 } : item
-          );
-        }
-        const item: CartItem = {
-          key,
-          medicineId: medicine.id,
-          name: medicine.name ?? `Medicine #${medicine.id}`,
-          generic: medicine.generic,
-          strength: medicine.strength,
-          dosageForm: medicine.dosageForm,
-          packageLabel: pkg.label,
-          packSize: pkg.packSize,
-          unitPrice: pkg.price,
-          qty: 1,
-        };
-        return [...prev, item];
-      });
+          )
+        : [
+            ...current,
+            {
+              key,
+              medicineId: medicine.id,
+              name: medicine.name ?? `Medicine #${medicine.id}`,
+              generic: medicine.generic,
+              strength: medicine.strength,
+              dosageForm: medicine.dosageForm,
+              packageLabel: pkg.label,
+              packSize: pkg.packSize,
+              unitPrice: pkg.price,
+              qty: 1,
+            } as CartItem,
+          ];
+      writeStored(CART_KEY, next);
 
       const id = Date.now() + Math.random();
       setToasts((prev) => [
@@ -188,20 +216,21 @@ export function AppProviders({ children }: { children: ReactNode }) {
   );
 
   const updateQty = useCallback((key: string, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) =>
-          item.key === key ? { ...item, qty: Math.max(0, item.qty + delta) } : item
-        )
-        .filter((item) => item.qty > 0)
-    );
+    const current = loadFromStorage<CartItem[]>(CART_KEY, []);
+    const next = current
+      .map((item) => (item.key === key ? { ...item, qty: Math.max(0, item.qty + delta) } : item))
+      .filter((item) => item.qty > 0);
+    writeStored(CART_KEY, next);
   }, []);
 
   const removeFromCart = useCallback((key: string) => {
-    setCart((prev) => prev.filter((item) => item.key !== key));
+    const current = loadFromStorage<CartItem[]>(CART_KEY, []);
+    writeStored(CART_KEY, current.filter((item) => item.key !== key));
   }, []);
 
-  const clearCart = useCallback(() => setCart([]), []);
+  const clearCart = useCallback(() => {
+    writeStored<CartItem[]>(CART_KEY, []);
+  }, []);
 
   const saveInvoice = useCallback(async (invoice: Invoice) => {
     let saved = invoice;
@@ -218,24 +247,24 @@ export function AppProviders({ children }: { children: ReactNode }) {
     } catch {
       // DB unavailable — invoice stays in localStorage only.
     }
-    setInvoices((prev) => dedupeById([saved, ...prev]));
+    const current = loadFromStorage<Invoice[]>(INVOICES_KEY, []);
+    writeStored(INVOICES_KEY, dedupeById([saved, ...current]));
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        const localBefore = loadFromStorage<Invoice[]>(INVOICES_KEY, []);
         const response = await fetch("/api/invoices", { cache: "no-store" });
         const payload = (await response.json()) as { invoices?: Invoice[] };
         if (!response.ok || !Array.isArray(payload.invoices)) return;
         if (cancelled) return;
-        setInvoices(payload.invoices);
+        writeStored(INVOICES_KEY, payload.invoices);
 
         // Migrate invoices that only exist in localStorage over to the DB.
         const serverIds = new Set(payload.invoices.map((invoice) => invoice.id));
-        const localOnly = loadFromStorage<Invoice[]>(INVOICES_KEY, []).filter(
-          (invoice) => !serverIds.has(invoice.id)
-        );
+        const localOnly = localBefore.filter((invoice) => !serverIds.has(invoice.id));
         for (const local of localOnly) {
           await fetch("/api/invoices", {
             method: "POST",
@@ -303,7 +332,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
       seed.push(invoice);
     }
 
-    setInvoices((prev) => dedupeById([...seed, ...prev]));
+    const current = loadFromStorage<Invoice[]>(INVOICES_KEY, []);
+    writeStored(INVOICES_KEY, dedupeById([...seed, ...current]));
 
     // Best-effort push to the DB; UI is not blocked on it.
     for (const invoice of seed) {

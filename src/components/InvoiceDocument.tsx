@@ -45,6 +45,17 @@ export default function InvoiceDocument({ invoice }: { invoice: Invoice }) {
         <span>Demo Operator</span>
       </div>
 
+      {invoice.customer && (
+        <div className="invoice-meta" style={{ marginTop: 12 }}>
+          <span className="faint">Customer</span>
+          <span>{invoice.customer.name || "—"}</span>
+          <span className="faint">Phone</span>
+          <span className="font-mono-data">{invoice.customer.phone || "—"}</span>
+          <span className="faint">Address</span>
+          <span>{invoice.customer.address || "—"}</span>
+        </div>
+      )}
+
       <table className="invoice-table">
         <thead>
           <tr>

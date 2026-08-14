@@ -44,6 +44,12 @@ export interface InvoiceItem {
   lineTotal: number;
 }
 
+export interface CustomerInfo {
+  name: string;
+  address: string;
+  phone: string;
+}
+
 export interface Invoice {
   id: string;
   createdAt: string;
@@ -52,6 +58,7 @@ export interface Invoice {
   discount: number;
   total: number;
   paymentMethod: string;
+  customer?: CustomerInfo;
 }
 
 export type SortKey =

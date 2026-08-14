@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useStore } from "@/lib/store";
 import type { Invoice } from "@/lib/types";
 import { formatBDT, formatDateTime } from "@/lib/format";
@@ -11,7 +10,6 @@ import {
   CalendarIcon,
   ChartIcon,
   ClockIcon,
-  HomeIcon,
   PrinterIcon,
   ReceiptIcon,
   SearchIcon,
@@ -58,6 +56,7 @@ interface Stats {
 export default function InvoicesPage() {
   const { invoices, seedInvoices } = useStore();
   const [query, setQuery] = useState("");
+  const [searchField, setSearchField] = useState<"all" | "customer" | "phone">("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [method, setMethod] = useState("all");
@@ -110,14 +109,25 @@ export default function InvoicesPage() {
       if (method !== "all" && invoice.paymentMethod !== method) return false;
       if (!inRange(invoice, fromDate, toDate)) return false;
       if (q) {
-        const haystack = [
-          invoice.id,
-          invoice.paymentMethod,
-          ...invoice.items.map((item) => item.name),
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(q)) return false;
+        const customer = invoice.customer;
+        let haystack: string;
+        switch (searchField) {
+          case "customer":
+            haystack = customer?.name ?? "";
+            break;
+          case "phone":
+            haystack = customer?.phone ?? "";
+            break;
+          default:
+            haystack = [
+              invoice.id,
+              invoice.paymentMethod,
+              ...invoice.items.map((item) => item.name),
+              customer?.name ?? "",
+              customer?.phone ?? "",
+            ].join(" ");
+        }
+        if (!haystack.toLowerCase().includes(q)) return false;
       }
       return true;
     });
@@ -137,7 +147,7 @@ export default function InvoicesPage() {
         break;
     }
     return list;
-  }, [invoices, query, from, to, method, sortKey]);
+  }, [invoices, query, searchField, from, to, method, sortKey]);
 
   const methods = useMemo(
     () => [...new Set(invoices.map((invoice) => invoice.paymentMethod))].sort(),
@@ -193,25 +203,6 @@ export default function InvoicesPage() {
             <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
               Invoices & Revenue
             </h1>
-            <p className="muted" style={{ fontSize: 13, margin: "2px 0 0" }}>
-              {filtered.length.toLocaleString()} of {invoices.length.toLocaleString()} invoices shown
-            </p>
-          </div>
-          <div className="spacer" />
-          <Link href="/" className="btn btn-secondary">
-            <HomeIcon width={16} height={16} />
-            Back to inventory
-          </Link>
-          <div className="search-bar">
-            <span className="search-icon">
-              <SearchIcon width={16} height={16} />
-            </span>
-            <input
-              className="input"
-              placeholder="Search invoice or product…"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
           </div>
         </div>
 
@@ -231,6 +222,33 @@ export default function InvoicesPage() {
         </div>
 
         <div className="filter-bar card" style={{ padding: 14, marginBottom: 20 }}>
+          <select
+            className="select"
+            value={searchField}
+            onChange={(event) => setSearchField(event.target.value as typeof searchField)}
+            aria-label="Search by"
+          >
+            <option value="all">Search all</option>
+            <option value="customer">Customer name</option>
+            <option value="phone">Phone number</option>
+          </select>
+          <div className="search-bar">
+            <span className="search-icon">
+              <SearchIcon width={16} height={16} />
+            </span>
+            <input
+              className="input"
+              placeholder={
+                searchField === "customer"
+                  ? "Search customer name…"
+                  : searchField === "phone"
+                    ? "Search phone number…"
+                    : "Search invoice or product…"
+              }
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
           <input
             type="date"
             className="input"
