@@ -22,6 +22,7 @@ export default function PaymentModal() {
     if (cart.length === 0) return null;
     const items = cart.map((item) => ({
       medicineId: item.medicineId,
+      packageIndex: item.packageIndex,
       name: item.name,
       generic: item.generic,
       strength: item.strength,

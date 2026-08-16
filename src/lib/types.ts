@@ -2,6 +2,7 @@ export interface Package {
   label: string | null;
   packSize: number | null;
   price: number | null;
+  stock: number | null;
 }
 
 export interface Medicine {
@@ -21,6 +22,7 @@ export interface Medicine {
 export interface CartItem {
   key: string;
   medicineId: number;
+  packageIndex: number;
   name: string;
   generic: string | null;
   strength: string | null;
@@ -33,6 +35,7 @@ export interface CartItem {
 
 export interface InvoiceItem {
   medicineId: number;
+  packageIndex: number;
   name: string;
   generic: string | null;
   strength: string | null;

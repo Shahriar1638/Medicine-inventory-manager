@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDb, isDbConfigured } from "@/lib/db";
 import InvoiceModel from "@/lib/models/Invoice";
 import { nextInvoiceId } from "@/lib/format";
+import { seedStock } from "@/lib/stock";
 
 function unavailableResponse(): NextResponse {
   return NextResponse.json(
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(body.createdAt ?? Date.now()),
       items: items.map((item: Record<string, unknown>) => ({
         medicineId: Number(item.medicineId),
+        packageIndex: item.packageIndex != null ? Number(item.packageIndex) : null,
         name: String(item.name ?? "Unknown item"),
         generic: item.generic ?? null,
         strength: item.strength ?? null,
@@ -89,6 +91,30 @@ export async function POST(request: NextRequest) {
       total,
       paymentMethod: String(body.paymentMethod ?? "Cash"),
     });
+
+    // Decrease stock in the imported medicines collection (best-effort — the
+    // sale is recorded regardless of whether the catalog exists in Mongo).
+    try {
+      const conn = await connectDb();
+      const db = conn.connection.db;
+      if (!db) throw new Error("Database connection not ready");
+      for (const item of items as Record<string, unknown>[]) {
+        const medicineId = Number(item.medicineId);
+        const packageIndex = Number(item.packageIndex);
+        const qty = Number(item.qty ?? 1);
+        if (!Number.isInteger(medicineId) || !Number.isInteger(packageIndex) || packageIndex < 0) {
+          continue;
+        }
+        const stockPath = `packages.${packageIndex}.stock`;
+        await db
+          .collection("medicines")
+          .updateOne({ id: medicineId, [stockPath]: null }, { $set: { [stockPath]: seedStock(medicineId, packageIndex) } });
+        await db.collection("medicines").updateOne({ id: medicineId }, { $inc: { [stockPath]: -qty } });
+        await db.collection("medicines").updateOne({ id: medicineId }, { $max: { [stockPath]: 0 } });
+      }
+    } catch (stockError) {
+      console.warn("[medix] stock decrement failed (non-fatal)", stockError);
+    }
 
     return NextResponse.json(
       {

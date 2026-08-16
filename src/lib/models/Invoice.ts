@@ -3,6 +3,7 @@ import { model, models, Schema } from "mongoose";
 const InvoiceItemSchema = new Schema(
   {
     medicineId: { type: Number, required: true },
+    packageIndex: { type: Number, default: null },
     name: { type: String, required: true },
     generic: { type: String, default: null },
     strength: { type: String, default: null },

@@ -87,7 +87,7 @@ export default function AddMedicineModal({
       drugClass: drugClass.trim() || null,
       indication: indication.trim() || null,
       storageConditions: storageConditions.trim() || null,
-      packages: [{ label: null, packSize: null, price: priceNumber }],
+      packages: [{ label: null, packSize: null, price: priceNumber, stock: null }],
     };
 
     addMedicine(medicine);

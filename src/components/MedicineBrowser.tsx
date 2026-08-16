@@ -9,6 +9,7 @@ import { CartIcon, EditIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import CartDrawer from "@/components/CartDrawer";
 import PaymentModal from "@/components/PaymentModal";
 import AddMedicineModal from "@/components/AddMedicineModal";
+import { CloseButton } from "@/components/Header";
 
 const PAGE_SIZES = [24, 48, 96];
 
@@ -32,15 +33,33 @@ function firstPricedPackageIndex(medicine: Medicine): number {
   return medicine.packages.findIndex((pkg) => pkg.price !== null);
 }
 
-// Demo placeholder until real stock data exists: a stable pseudo-random number
-// (12–500) per medicine, derived from its id so it never flickers between renders.
-function demoStock(medicine: Medicine): number {
-  const n = Math.abs(Math.sin(medicine.id) * 10000);
-  return 12 + Math.floor(n % 489);
-}
-
 function MedicineCard({ medicine }: { medicine: Medicine }) {
+  const { stockOf, adjustStock } = useStore();
   const price = defaultPriceOf(medicine);
+  const packageIndex = firstPricedPackageIndex(medicine);
+  const stock = packageIndex >= 0 ? stockOf(medicine.id, packageIndex) : 0;
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [draft, setDraft] = useState(0);
+  const pkgLabel = packageIndex >= 0 ? medicine.packages[packageIndex].label : null;
+  const preview = Math.max(0, stock + draft);
+
+  const closeModal = () => {
+    setOpen(false);
+    setConfirming(false);
+    setDraft(0);
+  };
+
+  const handleConfirm = () => {
+    if (draft === 0) return;
+    adjustStock(medicine.id, packageIndex, draft);
+    void fetch("/api/medicines/stock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ medicineId: medicine.id, packageIndex, delta: draft }),
+    }).catch(() => {});
+    closeModal();
+  };
 
   return (
     <article className="medicine-card">
@@ -81,13 +100,123 @@ function MedicineCard({ medicine }: { medicine: Medicine }) {
           marginTop: "auto",
         }}
       >
-        <span className="faint" style={{ fontSize: 12.5 }}>
-          Stock: {demoStock(medicine)}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          <span
+            className={stock > 0 ? "faint" : ""}
+            style={
+              stock === 0
+                ? { fontSize: 12.5, fontWeight: 600, color: "var(--warning)" }
+                : { fontSize: 12.5 }
+            }
+          >
+            {stock > 0 ? `Stock: ${stock}` : "Out of stock"}
+          </span>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setOpen(true)}
+            disabled={packageIndex < 0}
+            title={packageIndex < 0 ? "No priced package" : "Update stock"}
+          >
+            Update
+          </button>
+        </div>
         <span className="font-mono-data" style={{ fontSize: 17, fontWeight: 700 }}>
           {formatBDT(price)}
         </span>
       </div>
+
+      {open && (
+        <div className="overlay" onClick={closeModal}>
+          <div className="modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <h2 className="section-title">Update stock</h2>
+              <CloseButton onClick={closeModal} />
+            </div>
+            <div className="modal-body">
+              <div className="truncate" style={{ fontWeight: 600, fontSize: 15 }}>
+                {medicine.name}
+              </div>
+              <div className="muted truncate" style={{ fontSize: 12.5, marginTop: 2 }}>
+                {[medicine.dosageForm, pkgLabel].filter(Boolean).join(" · ") || "—"}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginTop: 16,
+                  padding: "12px 14px",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--r-md)",
+                }}
+              >
+                <span className="faint" style={{ fontSize: 13 }}>
+                  Current: <strong className="font-mono-data">{stock}</strong>
+                </span>
+                <span className="stepper">
+                  <button
+                    onClick={() => setDraft((d) => d - 1)}
+                    disabled={preview <= 0}
+                    aria-label="Decrease stock"
+                  >
+                    −
+                  </button>
+                  <input
+                    className="stepper-input"
+                    type="number"
+                    value={draft}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      setDraft(Number.isFinite(value) ? Math.trunc(value) : 0);
+                    }}
+                    aria-label="Stock adjustment amount"
+                  />
+                  <button onClick={() => setDraft((d) => d + 1)} aria-label="Increase stock">
+                    +
+                  </button>
+                </span>
+                <span className="faint" style={{ fontSize: 13 }}>
+                  New: <strong className="font-mono-data">{preview}</strong>
+                </span>
+              </div>
+
+              {confirming ? (
+                <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.6 }}>
+                  Did you actually{" "}
+                  {draft > 0
+                    ? `add ${Math.abs(draft)} extra product${Math.abs(draft) === 1 ? "" : "s"}`
+                    : `remove or sell ${Math.abs(draft)} product${Math.abs(draft) === 1 ? "" : "s"}`}
+                  ? The stock is only updated after you confirm.
+                </p>
+              ) : (
+                draft !== 0 && (
+                  <p style={{ margin: "14px 0 0", fontSize: 14, lineHeight: 1.6 }}>
+                    You are about to <strong>{draft > 0 ? "increase" : "decrease"}</strong> the stock
+                    by <strong>{Math.abs(draft)}</strong> unit{Math.abs(draft) === 1 ? "" : "s"}.
+                  </p>
+                )
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={confirming ? () => setConfirming(false) : closeModal}>
+                {confirming ? "Back" : "Cancel"}
+              </button>
+              {confirming ? (
+                <button className="btn btn-primary" onClick={handleConfirm}>
+                  Confirm
+                </button>
+              ) : (
+                <button className="btn btn-primary" disabled={draft === 0} onClick={() => setConfirming(true)}>
+                  Save
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   );
 }
@@ -99,10 +228,13 @@ function MedicineRow({
   medicine: Medicine;
   onAdd: (packageIndex: number) => void;
 }) {
+  const { stockOf } = useStore();
   const [selected, setSelected] = useState(() => firstPricedPackageIndex(medicine));
   const selectedPackage =
     selected >= 0 && selected < medicine.packages.length ? medicine.packages[selected] : null;
   const selectable = medicine.packages.length > 0;
+  const selectedStock = selected >= 0 ? stockOf(medicine.id, selected) : 0;
+  const outOfStock = !selectedPackage || selectedPackage.price === null || selectedStock <= 0;
 
   return (
     <div className="med-row">
@@ -130,11 +262,16 @@ function MedicineRow({
           aria-label={`${medicine.name} package`}
           style={{ paddingTop: 6, paddingBottom: 6, width: 200, flex: "0 0 200px" }}
         >
-          {medicine.packages.map((pkg, index) => (
-            <option key={index} value={index} disabled={pkg.price === null}>
-              {pkg.label || `Package ${index + 1}`} — {formatBDT(pkg.price)}
-            </option>
-          ))}
+          {medicine.packages.map((pkg, index) => {
+            const stock = stockOf(medicine.id, index);
+            const disabled = pkg.price === null || stock <= 0;
+            return (
+              <option key={index} value={index} disabled={disabled}>
+                {pkg.label || `Package ${index + 1}`} — {formatBDT(pkg.price)} ·{" "}
+                {stock > 0 ? `${stock} in stock` : "out of stock"}
+              </option>
+            );
+          })}
         </select>
       ) : (
         <span
@@ -150,11 +287,15 @@ function MedicineRow({
       <button
         className="btn btn-primary btn-sm"
         style={{ minWidth: 86 }}
-        disabled={!selectedPackage || selectedPackage.price === null}
+        disabled={outOfStock}
         onClick={() => onAdd(selected)}
       >
         <CartIcon width={14} height={14} />
-        Add
+        {!selectable || selectedPackage?.price === null
+          ? "No price"
+          : selectedStock <= 0
+            ? "Out of stock"
+            : "Add"}
       </button>
     </div>
   );

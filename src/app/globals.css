@@ -861,6 +861,30 @@ html.dark .theme-icon-light {
   font-variant-numeric: tabular-nums;
 }
 
+.stepper .stepper-input {
+  width: 64px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.stepper .stepper-input::-webkit-inner-spin-button,
+.stepper .stepper-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepper .stepper-input:focus {
+  outline: none;
+}
+
 /* ---------- Stats ---------- */
 
 .stats-grid {

@@ -35,6 +35,21 @@ if (!Array.isArray(medicines) || medicines.length === 0) {
   process.exit(1);
 }
 
+// Same seeding as src/lib/stock.ts — keep in sync so the Mongo catalog and the
+// client-side stock model agree.
+function seedStock(medicineId, packageIndex) {
+  const n = Math.abs(Math.sin(medicineId * 7 + packageIndex * 13) * 100000);
+  return 12 + Math.floor(n % 240);
+}
+
+const seeded = medicines.map((medicine) => ({
+  ...medicine,
+  packages: (medicine.packages ?? []).map((pkg, i) => ({
+    ...pkg,
+    stock: seedStock(medicine.id, i),
+  })),
+}));
+
 console.log(`Connecting to ${uri.replace(/\/\/[^@]+@/, "//***@")} ...`);
 
 try {
@@ -46,8 +61,8 @@ try {
 
   const CHUNK = 500;
   let inserted = 0;
-  for (let i = 0; i < medicines.length; i += CHUNK) {
-    const chunk = medicines.slice(i, i + CHUNK);
+  for (let i = 0; i < seeded.length; i += CHUNK) {
+    const chunk = seeded.slice(i, i + CHUNK);
     await db.collection("medicines").insertMany(chunk, { ordered: false });
     inserted += chunk.length;
   }

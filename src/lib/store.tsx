@@ -11,11 +11,14 @@ import {
   type ReactNode,
 } from "react";
 import type { CartItem, Invoice, Medicine } from "@/lib/types";
+import { effectiveStock, stockKey } from "@/lib/stock";
 
 const CART_KEY = "medshop.cart";
 const INVOICES_KEY = "medshop.invoices";
 const THEME_KEY = "medshop.theme";
 const EXTRA_MEDICINES_KEY = "medshop.medicines.extra";
+const SOLD_KEY = "medshop.stock.sold";
+const STOCK_ADJUST_KEY = "medshop.stock.adjust";
 const MEDICINES_URL = "/medicines.json";
 
 type Theme = "light" | "dark";
@@ -38,6 +41,8 @@ interface StoreValue {
   paymentOpen: boolean;
   setPaymentOpen: (open: boolean) => void;
   addToCart: (medicine: Medicine, packageIndex: number) => void;
+  stockOf: (medicineId: number, packageIndex: number) => number;
+  adjustStock: (medicineId: number, packageIndex: number, delta: number) => void;
   addMedicine: (medicine: Medicine) => void;
   toasts: Toast[];
   dismissToast: (id: number) => void;
@@ -143,6 +148,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const theme = useStored<Theme>(THEME_KEY, "light");
   const cart = useStored<CartItem[]>(CART_KEY, []);
   const invoices = useStored<Invoice[]>(INVOICES_KEY, []);
+  const soldStock = useStored<Record<string, number>>(SOLD_KEY, {});
+  const stockAdjust = useStored<Record<string, number>>(STOCK_ADJUST_KEY, {});
   const [cartOpen, setCartOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -185,6 +192,24 @@ export function AppProviders({ children }: { children: ReactNode }) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  const stockOf = useCallback(
+    (medicineId: number, packageIndex: number) =>
+      effectiveStock(medicineId, packageIndex, soldStock, stockAdjust),
+    [soldStock, stockAdjust]
+  );
+
+  const adjustStock = useCallback(
+    (medicineId: number, packageIndex: number, delta: number) => {
+      const key = stockKey(medicineId, packageIndex);
+      const current = loadFromStorage<Record<string, number>>(STOCK_ADJUST_KEY, {});
+      writeStored(STOCK_ADJUST_KEY, {
+        ...current,
+        [key]: Math.max(0, (current[key] ?? 0) + delta),
+      });
+    },
+    []
+  );
+
   const addToCart = useCallback(
     (medicine: Medicine, packageIndex: number) => {
       const pkg = medicine.packages[packageIndex];
@@ -202,6 +227,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
             {
               key,
               medicineId: medicine.id,
+              packageIndex,
               name: medicine.name ?? `Medicine #${medicine.id}`,
               generic: medicine.generic,
               strength: medicine.strength,
@@ -278,6 +304,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
     }
     const current = loadFromStorage<Invoice[]>(INVOICES_KEY, []);
     writeStored(INVOICES_KEY, dedupeById([saved, ...current]));
+
+    // Decrease stock per package by the quantities actually sold.
+    const sold = { ...loadFromStorage<Record<string, number>>(SOLD_KEY, {}) };
+    for (const item of saved.items) {
+      if (typeof item.packageIndex !== "number") continue;
+      const key = `${item.medicineId}:${item.packageIndex}`;
+      sold[key] = (sold[key] ?? 0) + item.qty;
+    }
+    writeStored(SOLD_KEY, sold);
   }, []);
 
   useEffect(() => {
@@ -329,12 +364,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
       const items = [];
       for (let j = 0; j < itemCount; j++) {
         const medicine = pick(seed.length + j * 7 + i * 3);
-        const priced =
-          medicine.packages.find((p) => p.price !== null) ?? medicine.packages[0];
+        const packageIndex = medicine.packages.findIndex((p) => p.price !== null);
+        const priced = medicine.packages[packageIndex];
         if (!priced || priced.price === null) continue;
         const qty = rand(1, 5);
         items.push({
           medicineId: medicine.id,
+          packageIndex,
           name: medicine.name ?? `Medicine #${medicine.id}`,
           generic: medicine.generic,
           strength: medicine.strength,
@@ -396,6 +432,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
       paymentOpen,
       setPaymentOpen,
       addToCart,
+      stockOf,
+      adjustStock,
       addMedicine,
       toasts,
       dismissToast,
@@ -417,6 +455,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
       cartOpen,
       paymentOpen,
       addToCart,
+      stockOf,
+      adjustStock,
       addMedicine,
       toasts,
       dismissToast,
